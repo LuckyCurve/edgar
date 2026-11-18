@@ -1,5 +1,9 @@
+import io
+import sys
 import unittest
+from unittest import mock
 
+from edgar.cli.main import _configure_stdout
 from edgar.cli.output import paginate, truncate_text
 
 
@@ -21,6 +25,17 @@ class PaginationTests(unittest.TestCase):
         items, meta = paginate([1, 2], limit=10, offset=9)
         self.assertEqual(items, [])
         self.assertFalse(meta["has_more"])
+
+
+class EncodingTests(unittest.TestCase):
+    def test_stdout_is_switched_to_utf8(self):
+        raw = io.BytesIO()
+        stream = io.TextIOWrapper(raw, encoding="gbk")
+        with mock.patch.object(sys, "stdout", stream):
+            _configure_stdout()
+            print("☐")
+            stream.flush()
+        self.assertEqual(raw.getvalue().decode("utf-8").strip(), "☐")
 
 
 class TruncateTests(unittest.TestCase):

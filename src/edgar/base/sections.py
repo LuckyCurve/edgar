@@ -6,7 +6,9 @@ from typing import Iterable
 from edgar.base.errors import NotFoundError
 from edgar.base.html import Block, extract_text
 
-ITEM_RE = re.compile(r"^item\s+(\d{1,2}(?:\.\d{2})?[A-Z]?)\s*[\.\:\-–—]?\s*(.*)$", re.IGNORECASE)
+ITEM_RE = re.compile(
+    r"^item\s+(\d{1,2}(?:\.\d{2})?\s*[A-Z]?)\s*[\.\:\-–—]?\s*(.*)$", re.IGNORECASE
+)
 PART_RE = re.compile(r"^part\s+(i{1,3}|iv)\b", re.IGNORECASE)
 
 ANNUAL_FORMS = {"10-K", "10-K/A", "10-KT", "40-F", "40-F/A"}
@@ -127,8 +129,6 @@ def _find_items(blocks: Iterable[Block], form_family: str):
     part_boundaries: list[int] = []
     candidates: list[dict] = []
     for index, block in enumerate(blocks):
-        if block.is_table:
-            continue
         text = block.text
         if len(text) < 160:
             part_match = PART_RE.match(text)
@@ -143,7 +143,10 @@ def _find_items(blocks: Iterable[Block], form_family: str):
             continue
         if len(re.findall(r"\bitem\s+\d", text, re.IGNORECASE)) != 1:
             continue
-        item = item_match.group(1).upper()
+        if block.is_table and re.search(r"\b\d{1,3}\s*$", text):
+            # TOC rows end with a page number; real headings do not.
+            continue
+        item = item_match.group(1).replace(" ", "").upper()
         candidates.append(
             {
                 "index": index,
@@ -202,15 +205,27 @@ def _build_sections(blocks: list[Block], entries: list[dict], boundaries: list[i
 def _extract_proxy_sections(blocks: list[Block]) -> list[dict]:
     found: dict[str, dict] = {}
     for index, block in enumerate(blocks):
-        if block.is_table or len(block.text) > 160:
+        if not block.text or len(block.text) > 160:
             continue
         text = block.text
-        heading_like = (
-            (block.font_size or 0) >= 10.5
-            or block.bold
-            or block.tag in {"h1", "h2", "h3", "h4", "h5", "h6"}
-            or len(text) <= 60
-        )
+        if block.is_table:
+            # Headings are often their own table row. TOC rows and data rows
+            # have page numbers, dot leaders, or multiple cells.
+            if (
+                len(text) > 80
+                or "|" in text
+                or re.search(r"\.{3,}\s*\d+\s*$", text)
+                or re.search(r"\b\d{1,3}\s*$", text)
+            ):
+                continue
+            heading_like = True
+        else:
+            heading_like = (
+                (block.font_size or 0) >= 10.5
+                or block.bold
+                or block.tag in {"h1", "h2", "h3", "h4", "h5", "h6"}
+                or len(text) <= 60
+            )
         if not heading_like:
             continue
         for key, pattern in _PROXY_HEADINGS:
@@ -227,12 +242,12 @@ def _extract_proxy_sections(blocks: list[Block]) -> list[dict]:
     known = {entry["index"] for entry in entries}
     major: set[int] = set()
     for index, block in enumerate(blocks):
-        if block.is_table or not block.text:
+        if not block.text:
             continue
         if index in known:
             major.add(index)
             continue
-        if len(block.text) > 160:
+        if block.is_table or len(block.text) > 160:
             continue
         if (block.font_size or 0) >= 14 or block.tag in {"h1", "h2", "h3"}:
             major.add(index)

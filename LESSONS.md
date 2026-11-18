@@ -14,3 +14,7 @@
 | 20-F 公司 `company` 的 latest 为空 | 默认只查 10-K / 10-Q / DEF 14A，外国私人发行人没有这些表单 | 默认同时查 20-F |
 | 20-F 公司查 revenue 一个结果都没有 | 它们用 `ifrs-full` 而不是 `us-gaap`，默认 taxonomy 查空 | `detect_taxonomy` 自动选有数据的 taxonomy，CLI 不再写死 `us-gaap` |
 | 20-F 的 risk / business / MD&A 别名指向错误 Item | 20-F Item 编号与 10-K 不同（3 风险、4 业务、5 OFR、6 董事） | 单独维护 `_TWENTY_F_ALIASES`，不混用 10-K 映射 |
+| GGB / DECK 的章节或薪酬表整章缺失 | 标题本身是表格里的一行，早先直接跳过所有表格 | 非目录的表格标题也参与识别；目录行靠页码、点线或多单元格排除 |
+| `Item 4 A.` 被当成 Item 4 的正文 | Item 后缀字母前有空格，正则没覆盖 | 正则允许空格，解析后去掉空白再归一化 |
+| DECK 的 Summary Compensation Table 被算进 CD&A | 已知标题在表格里，没被加进章节边界集合，前一章一直延伸到文末 | 先判断已知标题，再决定是否跳过表格 |
+| Windows 下输出含 ☐ / • 时命令崩溃 | 管道默认用 GBK 编码，JSON 里有 GBK 不支持的字符 | `main` 启动时把 stdout/stderr 重设为 UTF-8 |

@@ -44,6 +44,17 @@ TWENTY_F = """
 </body></html>
 """
 
+PROXY_TABLE_HEADINGS = """
+<html><body>
+<table><tr><td>COMPENSATION DISCUSSION AND ANALYSIS</td></tr></table>
+<p>CD&amp;A text.</p>
+<table><tr><td>SUMMARY COMPENSATION TABLE</td></tr></table>
+<table><tr><th>Name</th><th>Pay</th></tr><tr><td>Cook</td><td>1</td></tr></table>
+<table><tr><td>OUTSTANDING EQUITY AWARDS AT 2026 FISCAL YEAR END</td></tr></table>
+<table><tr><th>Name</th><th>Shares</th></tr><tr><td>Cook</td><td>2</td></tr></table>
+</body></html>
+"""
+
 PROXY = """
 <html><body>
 <div>Compensation Discussion and Analysis</div><p>CD&amp;A text.</p>
@@ -99,6 +110,33 @@ class TenQTests(unittest.TestCase):
 
 
 class TwentyFTests(unittest.TestCase):
+    def test_heading_inside_non_toc_table(self):
+        html = """
+        <html><body>
+        <table><tr><td>Item 4. Information on the Company</td></tr></table>
+        <p>Business here.</p>
+        <table><tr><td>Item 5. Operating and Financial Review</td></tr></table>
+        <p>OFR here.</p>
+        </body></html>
+        """
+        result = sections(html, "20-F")
+        self.assertEqual([s["id"] for s in result], ["item-4", "item-5"])
+        self.assertIn("Business here.", find_section(result, "business")["text"])
+        self.assertIn("OFR here.", find_section(result, "mda")["text"])
+
+    def test_spaced_item_suffix(self):
+        html = """
+        <html><body>
+        <p>Item 4. Information on the Company</p><p>Business here.</p>
+        <p>Item 4 A. Unresolved Staff Comments</p><p>None.</p>
+        <p>Item 5. Operating and Financial Review</p><p>OFR here.</p>
+        </body></html>
+        """
+        result = sections(html, "20-F")
+        self.assertEqual([s["id"] for s in result], ["item-4", "item-4a", "item-5"])
+        self.assertIn("Business here.", find_section(result, "business")["text"])
+        self.assertEqual(find_section(result, "item-4a")["text"].strip(), "None.")
+
     def test_item_ids_and_aliases(self):
         result = sections(TWENTY_F, "20-F")
         self.assertEqual(
@@ -118,6 +156,14 @@ class ProxyTests(unittest.TestCase):
         ids = [s["id"] for s in result]
         self.assertIn("summary-compensation-table", ids)
         self.assertIn("pay-versus-performance", ids)
+
+    def test_headings_inside_tables(self):
+        result = sections(PROXY_TABLE_HEADINGS, "DEF 14A")
+        ids = [s["id"] for s in result]
+        self.assertIn("compensation-discussion-and-analysis", ids)
+        self.assertIn("summary-compensation-table", ids)
+        self.assertIn("outstanding-equity-awards", ids)
+        self.assertIn("CD&A text.", find_section(result, "compensation-discussion-and-analysis")["text"])
 
     def test_proxy_section_text_is_prose_only(self):
         result = sections(PROXY, "DEF 14A")

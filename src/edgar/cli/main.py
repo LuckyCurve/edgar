@@ -1180,7 +1180,17 @@ def _build_client(args) -> HttpClient:
     )
 
 
+def _configure_stdout() -> None:
+    """Keep JSON valid UTF-8 even on Windows consoles with a legacy code page."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, OSError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _configure_stdout()
     parser = build_parser()
     try:
         args = parser.parse_args(argv)

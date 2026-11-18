@@ -114,11 +114,14 @@ def main() -> int:
 
         def facts():
             concepts = checker.run("concepts", ticker, "--query", "revenue", "--limit", "10")
-            tags = [row["tag"] for row in concepts["data"]["concepts"]]
-            for tag in list(REVENUE_TAGS) + tags:
-                payload = checker.run(
-                    "facts", ticker, "--concept", tag, "--period", "annual", "--limit", "5"
-                )
+            tags = [row["tag"] for row in concepts["data"]["concepts"]] + list(REVENUE_TAGS)
+            for tag in dict.fromkeys(tags):
+                try:
+                    payload = checker.run(
+                        "facts", ticker, "--concept", tag, "--period", "annual", "--limit", "5"
+                    )
+                except AssertionError:
+                    continue
                 groups = payload["data"]["groups"]
                 if groups and groups[0]["facts"]:
                     return f"{tag} total={groups[0]['total']} last={groups[0]['last_end']}"
