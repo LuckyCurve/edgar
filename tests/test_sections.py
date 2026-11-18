@@ -34,6 +34,16 @@ TEN_Q = """
 </body></html>
 """
 
+TWENTY_F = """
+<html><body>
+<div>Item 3. Risk Factors</div><p>Risks here.</p>
+<div>Item 4. Information on the Company</div><p>Business here.</p>
+<div>Item 5. Operating and Financial Review and Prospects</div><p>OFR here.</p>
+<div>Item 6. Directors, Senior Management and Employees</div><p>People here.</p>
+<div>Item 18. Financial Statements</div><p>Statements.</p>
+</body></html>
+"""
+
 PROXY = """
 <html><body>
 <div>Compensation Discussion and Analysis</div><p>CD&amp;A text.</p>
@@ -86,6 +96,20 @@ class TenQTests(unittest.TestCase):
         result = sections(TEN_Q, "10-Q")
         self.assertEqual(find_section(result, "mda")["id"], "part-i-item-2")
         self.assertEqual(find_section(result, "legal")["id"], "part-ii-item-1")
+
+
+class TwentyFTests(unittest.TestCase):
+    def test_item_ids_and_aliases(self):
+        result = sections(TWENTY_F, "20-F")
+        self.assertEqual(
+            [s["id"] for s in result],
+            ["item-3", "item-4", "item-5", "item-6", "item-18"],
+        )
+        self.assertEqual(find_section(result, "risk")["id"], "item-3")
+        self.assertEqual(find_section(result, "business")["id"], "item-4")
+        self.assertEqual(find_section(result, "mda")["id"], "item-5")
+        self.assertEqual(find_section(result, "directors")["id"], "item-6")
+        self.assertEqual(find_section(result, "financial-statements")["id"], "item-18")
 
 
 class ProxyTests(unittest.TestCase):

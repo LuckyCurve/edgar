@@ -9,7 +9,8 @@ from edgar.base.html import Block, extract_text
 ITEM_RE = re.compile(r"^item\s+(\d{1,2}(?:\.\d{2})?[A-Z]?)\s*[\.\:\-–—]?\s*(.*)$", re.IGNORECASE)
 PART_RE = re.compile(r"^part\s+(i{1,3}|iv)\b", re.IGNORECASE)
 
-ANNUAL_FORMS = {"10-K", "10-K/A", "10-KT", "20-F", "20-F/A", "40-F", "40-F/A"}
+ANNUAL_FORMS = {"10-K", "10-K/A", "10-KT", "40-F", "40-F/A"}
+TWENTY_F_FORMS = {"20-F", "20-F/A"}
 QUARTERLY_FORMS = {"10-Q", "10-Q/A"}
 CURRENT_FORMS = {"8-K", "8-K/A"}
 PROXY_FORMS = {"DEF 14A", "DEFR14A", "PRE 14A", "PRE14A", "DEFA14A", "DEFM14A"}
@@ -31,6 +32,24 @@ _TEN_K_ALIASES = {
     "related-party": ("13", None),
     "auditor-fees": ("14", None),
     "exhibits": ("15", None),
+}
+
+_TWENTY_F_ALIASES = {
+    "risk-factors": ("3", None),
+    "risk": ("3", None),
+    "key-information": ("3", None),
+    "business": ("4", None),
+    "mda": ("5", None),
+    "md&a": ("5", None),
+    "management-discussion": ("5", None),
+    "operating-financial-review": ("5", None),
+    "directors": ("6", None),
+    "executive-compensation": ("6", None),
+    "compensation": ("6", None),
+    "major-shareholders": ("7", None),
+    "related-party": ("7", None),
+    "financial-statements": ("18", None),
+    "exhibits": ("19", None),
 }
 
 _TEN_Q_ALIASES = {
@@ -74,6 +93,8 @@ _PROXY_HEADINGS = [
 
 def _form_family(form: str) -> str:
     value = form.upper().strip()
+    if value in TWENTY_F_FORMS:
+        return "twenty-f"
     if value in ANNUAL_FORMS:
         return "annual"
     if value in QUARTERLY_FORMS:
@@ -88,6 +109,8 @@ def _form_family(form: str) -> str:
 def _aliases(form_family: str, item: str, part: str | None) -> list[str]:
     if form_family == "annual":
         return [name for name, (number, _) in _TEN_K_ALIASES.items() if number == item]
+    if form_family == "twenty-f":
+        return [name for name, (number, _) in _TWENTY_F_ALIASES.items() if number == item]
     if form_family == "quarterly":
         return [
             name
@@ -143,7 +166,7 @@ def _dedupe_ids(entries: list[dict], form_family: str) -> None:
         counts[entry["item"]] = counts.get(entry["item"], 0) + 1
     for entry in entries:
         item_slug = entry["item"].lower().replace(".", "-")
-        if form_family == "annual" and counts[entry["item"]] == 1:
+        if form_family in {"annual", "twenty-f"} and counts[entry["item"]] == 1:
             entry["id"] = f"item-{item_slug}"
         else:
             part_slug = (entry["part"] or "x").lower()

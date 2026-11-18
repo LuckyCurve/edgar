@@ -6,10 +6,23 @@ from typing import Any, Iterable
 from edgar.base.errors import NotFoundError
 
 Periods = {"annual", "quarterly", "ytd", "instant", "all"}
+PREFERRED_TAXONOMIES = ("us-gaap", "ifrs-full")
 
 
 def _taxonomy(facts: dict, taxonomy: str) -> dict:
     return (facts.get("facts") or {}).get(taxonomy) or {}
+
+
+def detect_taxonomy(facts: dict) -> str:
+    """Pick the taxonomy that actually holds facts; foreign issuers file IFRS."""
+    available = facts.get("facts") or {}
+    for name in PREFERRED_TAXONOMIES:
+        if _taxonomy(facts, name):
+            return name
+    for name in sorted(available):
+        if name != "dei" and isinstance(available[name], dict) and available[name]:
+            return name
+    return "us-gaap"
 
 
 def list_concepts(

@@ -98,7 +98,7 @@ edgar concepts AAPL --query revenue
 edgar facts AAPL --concept RevenueFromContractWithCustomerExcludingAssessedTax --period annual --since 2016-01-01 --limit 20
 ```
 
-`facts` 默认按期间去重，只保留最新 filed。返回的 `last_end` 和数据过旧时的 warning 会提示是否换 tag。找不到概念时先 `concepts` 搜标签。
+`facts` 默认按期间去重，只保留最新 filed，并自动识别 `us-gaap` 或 `ifrs-full`（20-F 公司通常用 IFRS）。返回的 `last_end` 和数据过旧时的 warning 会提示是否换 tag。找不到概念时先 `concepts` 搜标签。
 
 **内部人交易**
 

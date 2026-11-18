@@ -1,7 +1,7 @@
 import unittest
 
 from edgar.base.errors import NotFoundError
-from edgar.base.facts import list_concepts, select_facts
+from edgar.base.facts import detect_taxonomy, list_concepts, select_facts
 
 
 def facts_fixture():
@@ -79,6 +79,47 @@ def facts_fixture():
             }
         },
     }
+
+
+def ifrs_fixture():
+    return {
+        "cik": 2,
+        "entityName": "Foreign Example Ltd",
+        "facts": {
+            "dei": {"EntityCommonStockSharesOutstanding": {"units": {"shares": []}}},
+            "ifrs-full": {
+                "Revenue": {
+                    "label": "Revenue",
+                    "units": {
+                        "USD": [
+                            {
+                                "start": "2025-01-01",
+                                "end": "2025-12-31",
+                                "val": 42,
+                                "accn": "f1",
+                                "form": "20-F",
+                                "filed": "2026-03-01",
+                            }
+                        ]
+                    },
+                }
+            },
+        },
+    }
+
+
+class TaxonomyTests(unittest.TestCase):
+    def test_prefers_us_gaap_when_present(self):
+        self.assertEqual(detect_taxonomy(facts_fixture()), "us-gaap")
+
+    def test_falls_back_to_ifrs(self):
+        self.assertEqual(detect_taxonomy(ifrs_fixture()), "ifrs-full")
+
+    def test_ifrs_concepts_and_facts(self):
+        result = list_concepts(ifrs_fixture(), query="revenue", taxonomy="ifrs-full")
+        self.assertEqual([c["tag"] for c in result], ["Revenue"])
+        selected = select_facts(ifrs_fixture(), ["Revenue"], taxonomy="ifrs-full", period="annual")
+        self.assertEqual(selected["groups"][0]["facts"][0]["val"], 42)
 
 
 class ConceptTests(unittest.TestCase):

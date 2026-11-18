@@ -23,7 +23,7 @@ from edgar.base.env import (
     save_config,
 )
 from edgar.base.errors import EdgarError, NotFoundError, ParseError, UsageError
-from edgar.base.facts import list_concepts, select_facts
+from edgar.base.facts import detect_taxonomy, list_concepts, select_facts
 from edgar.base.fulltext import search as fulltext_search
 from edgar.base.html import extract_text, iter_tables, table_context, table_matrix
 from edgar.base.http import (
@@ -147,7 +147,7 @@ def cmd_resolve(client, args) -> tuple[dict, list[str]]:
 def cmd_company(client, args) -> tuple[dict, list[str]]:
     candidate = _pick(client, args.query)
     profile = submissions.profile(client, candidate["cik"])
-    forms = _split(args.latest_form) or ["10-K", "10-Q", "DEF 14A"]
+    forms = _split(args.latest_form) or ["10-K", "20-F", "10-Q", "DEF 14A"]
     latest = {}
     for form in forms:
         result = submissions.list_filings(client, candidate["cik"], forms=[form], limit=1)
@@ -599,10 +599,11 @@ def cmd_facts(client, args) -> tuple[dict, list[str]]:
             "Specify --concept.",
             "Find tags with `edgar concepts <ticker> --query revenue`.",
         )
+    taxonomy = args.taxonomy or detect_taxonomy(facts)
     selected = select_facts(
         facts,
         concepts,
-        taxonomy=args.taxonomy,
+        taxonomy=taxonomy,
         since=args.since,
         until=args.until,
         period=args.period,
@@ -629,7 +630,7 @@ def cmd_facts(client, args) -> tuple[dict, list[str]]:
     data = {
         "company": {"cik": company["cik"], "name": facts.get("entityName") or company["name"]},
         "selection": {
-            "taxonomy": args.taxonomy,
+            "taxonomy": taxonomy,
             "period": args.period,
             "dedupe": "latest-filed" if not args.all else "all",
             "since": args.since,
@@ -650,8 +651,8 @@ def cmd_facts(client, args) -> tuple[dict, list[str]]:
             "--offset",
             str(args.offset + args.limit),
         ]
-        if args.taxonomy != "us-gaap":
-            extra += ["--taxonomy", args.taxonomy]
+        if taxonomy != "us-gaap":
+            extra += ["--taxonomy", taxonomy]
         if args.since:
             extra += ["--since", args.since]
         if args.until:
@@ -683,17 +684,18 @@ def cmd_facts(client, args) -> tuple[dict, list[str]]:
 def cmd_concepts(client, args) -> tuple[dict, list[str]]:
     company = _pick(client, args.query)
     facts = _company_facts(client, company["cik"])
+    taxonomy = args.taxonomy or detect_taxonomy(facts)
     rows = list_concepts(
         facts,
         query=args.query_text,
-        taxonomy=args.taxonomy,
+        taxonomy=taxonomy,
         limit=100000,
         include_description=args.detail,
     )
     page_rows, page = paginate(rows, args.limit, args.offset)
     data = {
         "company": {"cik": company["cik"], "name": facts.get("entityName") or company["name"]},
-        "taxonomy": args.taxonomy,
+        "taxonomy": taxonomy,
         "concepts": page_rows,
         "page": page,
         "usage": f"edgar facts {args.query} --concept <tag> --period annual",
@@ -1053,7 +1055,7 @@ def build_parser() -> AgentParser:
 
     p = add("company", "company profile and latest key filings")
     p.add_argument("query")
-    p.add_argument("--latest-form", action="append", help="repeatable; default 10-K, 10-Q, DEF 14A")
+    p.add_argument("--latest-form", action="append", help="repeatable; default 10-K, 20-F, 10-Q, DEF 14A")
 
     p = add("filings", "list filings, newest first")
     p.add_argument("query")
@@ -1109,8 +1111,8 @@ def build_parser() -> AgentParser:
 
     p = add("facts", "XBRL facts across years", "Annual facts by default; no ratios or derived values.")
     p.add_argument("query")
-    p.add_argument("--concept", action="append", required=True, help="us-gaap tag; repeatable or comma-separated")
-    p.add_argument("--taxonomy", default="us-gaap")
+    p.add_argument("--concept", action="append", required=True, help="tag; repeatable or comma-separated")
+    p.add_argument("--taxonomy", help="us-gaap or ifrs-full; detected when omitted")
     p.add_argument("--period", choices=["annual", "quarterly", "ytd", "instant", "all"], default="annual")
     p.add_argument("--since", help="period end >= YYYY-MM-DD")
     p.add_argument("--until", help="period end <= YYYY-MM-DD")
@@ -1123,7 +1125,7 @@ def build_parser() -> AgentParser:
     p = add("concepts", "search XBRL concept tags and labels")
     p.add_argument("query")
     p.add_argument("--query", dest="query_text", help="match tag, label, or description")
-    p.add_argument("--taxonomy", default="us-gaap")
+    p.add_argument("--taxonomy", help="us-gaap or ifrs-full; detected when omitted")
     p.add_argument("--limit", type=int, default=20)
     p.add_argument("--offset", type=int, default=0)
     p.add_argument("--detail", action="store_true", help="include descriptions")

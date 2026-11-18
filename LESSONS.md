@@ -11,3 +11,6 @@
 | `GOOG` / `GOOGL` 查出两家公司或顺序不稳 | SEC ticker 表按 ticker 行展开，同一 CIK 重复出现 | ticker 索引按 CIK 合并，ticker 排序后再比较 |
 | 终端里引号显示成乱码，以为解析坏了 | Windows 终端编码，不是数据问题 | 用 UTF-8 输出或看原始码点确认，不据此改解析 |
 | 测试结束时出现 `HTTPResourceWarning` | `HTTPError` 没关闭 | 读完错误响应后显式 `close()` |
+| 20-F 公司 `company` 的 latest 为空 | 默认只查 10-K / 10-Q / DEF 14A，外国私人发行人没有这些表单 | 默认同时查 20-F |
+| 20-F 公司查 revenue 一个结果都没有 | 它们用 `ifrs-full` 而不是 `us-gaap`，默认 taxonomy 查空 | `detect_taxonomy` 自动选有数据的 taxonomy，CLI 不再写死 `us-gaap` |
+| 20-F 的 risk / business / MD&A 别名指向错误 Item | 20-F Item 编号与 10-K 不同（3 风险、4 业务、5 OFR、6 董事） | 单独维护 `_TWENTY_F_ALIASES`，不混用 10-K 映射 |
